@@ -1,7 +1,6 @@
 function [time, log_data, line_idx] = ...
-    get_data_from_robot_csv(port_name, Tmax, target_folder)
+    get_data_from_robot_csv(port_name, Tmax, target_folder, baudrate)
 
-baudrate = 1000000;
 CHUNK_SIZE = 10000;
 
 should_terminate = false;
