@@ -11,7 +11,7 @@
 // Include the AS5600 library (for the encoders) and Sparkfun I2C Mux (for multiplexer)
 #include "AS5600.h"
 #include "SparkFun_I2C_Mux_Arduino_Library.h"
-
+#include "sensorbar.h"
 // Header for I2C communication
 #include "Wire.h"
 
@@ -19,13 +19,23 @@
 #define CONTROL_LOOP_PERIOD 5
 
 // Define the Multiplexer pins corresponding to each encoder
-#define LEFT_ENCODER_PIN 0
+#define LEFT_ENCODER_PIN 2
 #define RIGHT_ENCODER_PIN 1
+#define LINE_FOLLOWER_PIN 3
 
 QWIICMUX multiplexer;
 AS5600 rightEncoder, leftEncoder;
 
-#define TELEMETRY true
+// Uncomment one of the four lines to match your SX1509's address
+//  pin selects. SX1509 breakout defaults to [0:0] (0x3E).
+const uint8_t SX1509_ADDRESS = 0x3E;  // SX1509 I2C address (00)
+//const byte SX1509_ADDRESS = 0x3F;  // SX1509 I2C address (01)
+//const byte SX1509_ADDRESS = 0x70;  // SX1509 I2C address (10)
+//const byte SX1509_ADDRESS = 0x71;  // SX1509 I2C address (11)
+
+SensorBar mySensorBar(SX1509_ADDRESS);
+
+#define TELEMETRY false
 //I hope it works (it seems there is no need to include the file manually)
 
 void setup()
@@ -45,14 +55,7 @@ void setup()
   else
   {
     bool isInit = true;
-    // Set multiplexer to use port RIGHT_ENCODER_PIN to talk to right encoder.
-    multiplexer.setPort(RIGHT_ENCODER_PIN);
-    rightEncoder.begin();
-    if (!rightEncoder.isConnected())
-    {
-      println("Error: could not connect to right encoder. Check wiring.");
-      isInit = false;
-    }
+
     // Set multiplexer to use port LEFT_ENCODER_PIN to talk to left encoder.
     multiplexer.setPort(LEFT_ENCODER_PIN);
     leftEncoder.begin();
@@ -61,13 +64,41 @@ void setup()
       println("Error: could not connect to left encoder. Check wiring.");
       isInit = false;
     }
-
-    if (isInit)
+    
+    // Set multiplexer to use port RIGHT_ENCODER_PIN to talk to right encoder.
+    multiplexer.setPort(RIGHT_ENCODER_PIN);
+    rightEncoder.begin();
+    if (!rightEncoder.isConnected())
     {
-      // Configure motor control and feedback loop call.
-      mecatro::configureArduino(CONTROL_LOOP_PERIOD);
+      println("Error: could not connect to right encoder. Check wiring.");
+      isInit = false;
     }
-  }
+
+    // Set multiplexer to use port LINE_FOLLOWER_PIN to talk to lines follower.
+    multiplexer.setPort(LINE_FOLLOWER_PIN);
+
+    //For this demo, the IR will only be turned on during reads.
+    mySensorBar.setBarStrobe();
+    //Other option: Command to run all the time
+    //mySensorBar.clearBarStrobe();
+
+    //Default dark on light
+    mySensorBar.clearInvertBits();
+    //Other option: light line on dark
+    //mySensorBar.setInvertBits();
+    
+    //Don't forget to call .begin() to get the bar ready.  This configures HW.
+    uint8_t returnStatus = mySensorBar.begin();
+    if(returnStatus)
+    {
+      println("sx1509 IC communication OK");
+    }
+    else
+    {
+      println("sx1509 IC communication FAILED!");
+      while(1);
+    }
+    println();
 
   // Initialize telemetry
   unsigned int const nVariables = 3;
@@ -76,6 +107,7 @@ void setup()
   
   // Configure motor control and feedback loop call.
   mecatro::configureArduino(CONTROL_LOOP_PERIOD);
+  }
 }
 
 
@@ -142,10 +174,42 @@ void mecatro::controlLoop()
   println();
 
   // The first argument is the variable (column) id ; recall that in C++, numbering starts at 0.
-  mecatro::log(0,  rightEncoder.rawAngle() * AS5600_RAW_TO_DEGREES); 
-  mecatro::log(1,  rightEncoder.getCumulativePosition() * AS5600_RAW_TO_DEGREES); 
-  mecatro::log(2,  rightEncoder.getAngularSpeed()); 
+  mecatro::log(0,  leftEncoder.rawAngle() * AS5600_RAW_TO_DEGREES); 
+  mecatro::log(1,  leftEncoder.getCumulativePosition() * AS5600_RAW_TO_DEGREES); 
+  mecatro::log(2,  leftEncoder.getAngularSpeed()); 
+
+  //Get the data from the sensor bar and load it into the class members
+  multiplexer.setPort(LINE_FOLLOWER_PIN);
+  uint8_t rawValue = mySensorBar.getRaw();
+  
+  //Print the binary value to the serial buffer.
+  Serial.print("Bin value of input: ");
+  for( int i = 7; i >= 0; i-- )
+  {
+    Serial.print((rawValue >> i) & 0x01);
+  }
+  Serial.println("b");
+
+  //Print the hex value to the serial buffer.  
+  Serial.print("Hex value of bar: 0x");
+  if(rawValue < 0x10) //Serial.print( , HEX) doesn't pad zeros. Do it here
+  {
+	  //Pad a 0;
+	  Serial.print("0");
+  }
+  Serial.println(rawValue, HEX);
+  
+  //Print the position and density quantities
+  Serial.print("Position (-127 to 127): ");
+  Serial.println(mySensorBar.getPosition());
+  Serial.print("Density, bits detected (of 8): ");
+  Serial.println(mySensorBar.getDensity());
+  Serial.println("");
+  
+  //Wait 2/3 of a second
+  delay(666);
+
 
   // Keep the motor off, i.e. at 0 duty cycle (1 is full forward, -1 full reverse)
-  mecatro::setMotorDutyCycle(0.0, -0.0);
+  mecatro::setMotorDutyCycle(0.2, -0.2);
 }

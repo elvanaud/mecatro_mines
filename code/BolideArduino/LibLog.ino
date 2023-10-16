@@ -1,19 +1,23 @@
 #if TELEMETRY
 template<typename T>
-void println(T str){
+void println(T str)
+{
   ;
 }
 
 template<typename T>
-void print(T str){
+void print(T str)
+{
   ;
 }
 
-void print(){
+void print()
+{
   ;
 }
 
-void println(){
+void println()
+{
   ;
 }
 #else
