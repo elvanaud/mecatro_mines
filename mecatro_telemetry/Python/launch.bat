@@ -1,0 +1,1 @@
+python .\src\mecatro_telemetry\gui.py

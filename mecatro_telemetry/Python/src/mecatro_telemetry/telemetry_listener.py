@@ -7,7 +7,7 @@ from collections import OrderedDict
 import struct
 import serial
 import serial.tools.list_ports
-from .utils import *
+from utils import *
 
 CHUNK_SIZE = 10000
 

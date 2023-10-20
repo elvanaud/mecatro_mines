@@ -1,0 +1,4 @@
+build
+dist
+src/mecatro_telemetry.egg-info
+src/mecatro_telemetry/__pycache__

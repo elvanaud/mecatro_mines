@@ -12,8 +12,8 @@ import threading
 import time
 import datetime
 
-from .telemetry_listener import TelemetryListener
-from .telemetry_plotter import Plotter
+from telemetry_listener import TelemetryListener
+from telemetry_plotter import Plotter
 
 
 # custom manager to support custom classes
@@ -194,3 +194,6 @@ def main():
         proc.join()
         telemetry_listener.terminate()
         thread.join()
+        
+if __name__ == "__main__":
+    main()
