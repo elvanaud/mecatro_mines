@@ -27,11 +27,12 @@ class Plotter:
 
     def update(self, telemetry_listener):
         time, log_data, idx = telemetry_listener.get_data()
-
+        
         if idx < 0:
             return
 
         time = time[:idx]
+        
         # Display at most last 10 seconds
         sidx = bisect(time, time[-1] - 10)
         time = time[sidx:]

@@ -35,7 +35,7 @@ const uint8_t SX1509_ADDRESS = 0x3E;  // SX1509 I2C address (00)
 
 SensorBar mySensorBar(SX1509_ADDRESS);
 
-#define TELEMETRY false
+#define TELEMETRY true
 //I hope it works (it seems there is no need to include the file manually)
 
 void setup()
@@ -183,31 +183,31 @@ void mecatro::controlLoop()
   uint8_t rawValue = mySensorBar.getRaw();
   
   //Print the binary value to the serial buffer.
-  Serial.print("Bin value of input: ");
+  print("Bin value of input: ");
   for( int i = 7; i >= 0; i-- )
   {
-    Serial.print((rawValue >> i) & 0x01);
+    print((rawValue >> i) & 0x01);
   }
-  Serial.println("b");
+  println("b");
 
   //Print the hex value to the serial buffer.  
-  Serial.print("Hex value of bar: 0x");
+  print("Hex value of bar: 0x");
   if(rawValue < 0x10) //Serial.print( , HEX) doesn't pad zeros. Do it here
   {
 	  //Pad a 0;
-	  Serial.print("0");
+	  print("0");
   }
-  Serial.println(rawValue, HEX);
+  //println(rawValue, HEX);
   
   //Print the position and density quantities
-  Serial.print("Position (-127 to 127): ");
-  Serial.println(mySensorBar.getPosition());
-  Serial.print("Density, bits detected (of 8): ");
-  Serial.println(mySensorBar.getDensity());
-  Serial.println("");
+  print("Position (-127 to 127): ");
+  println(mySensorBar.getPosition());
+  print("Density, bits detected (of 8): ");
+  println(mySensorBar.getDensity());
+  println("");
   
   //Wait 2/3 of a second
-  delay(666);
+  //delay(666);
 
 
   // Keep the motor off, i.e. at 0 duty cycle (1 is full forward, -1 full reverse)
