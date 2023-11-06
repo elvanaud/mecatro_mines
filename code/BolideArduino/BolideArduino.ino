@@ -4,6 +4,7 @@
      - SparkFun I2C Mux Arduino Library
      - AS5600 library
 */
+#define TELEMETRY true
 
 // Include the current library
 #include "MecatroUtils.h"
@@ -15,13 +16,16 @@
 // Header for I2C communication
 #include "Wire.h"
 
+#include "LibLog.h"
+
+#define BAUDRATE 230400
 // Define the control loop period, in ms.
 #define CONTROL_LOOP_PERIOD 5
 
 // Define the Multiplexer pins corresponding to each encoder
-#define LEFT_ENCODER_PIN 2
-#define RIGHT_ENCODER_PIN 1
-#define LINE_FOLLOWER_PIN 3
+#define LEFT_ENCODER_PIN 7
+#define RIGHT_ENCODER_PIN 6
+#define LINE_FOLLOWER_PIN 1
 
 QWIICMUX multiplexer;
 AS5600 rightEncoder, leftEncoder;
@@ -35,13 +39,15 @@ const uint8_t SX1509_ADDRESS = 0x3E;  // SX1509 I2C address (00)
 
 SensorBar mySensorBar(SX1509_ADDRESS);
 
-#define TELEMETRY true
-//I hope it works (it seems there is no need to include the file manually)
+#include "LibDerivative.h"
+Buffer leftBufCumul(10);
+Buffer leftBufRaw(10);
+Buffer leftBuf2Derive(20);
 
 void setup()
 {
   // Setup serial communication with the PC - for debugging and logging.
-  Serial.begin(230400);
+  Serial.begin(BAUDRATE);
   // Start I2C communication
   Wire.begin();
   // Set I2C clock speed to 400kHz (fast mode)
@@ -118,13 +124,13 @@ void loop()
   mecatro::run();
 }
 
-
 // This function is called periodically, every CONTROL_LOOP_PERIOD ms.
 // Put all your code here.
 void mecatro::controlLoop()
 {
   // Set multiplexer to use port 0 to talk to right encoder.
   multiplexer.setPort(RIGHT_ENCODER_PIN);
+  println();
   print("Right encoder: raw angle ");
   // Raw encoder measurement - from 0 to 360 degrees
   print(rightEncoder.rawAngle() * AS5600_RAW_TO_DEGREES);
@@ -137,9 +143,9 @@ void mecatro::controlLoop()
   // This is not a problem here: with a typical update rate of 5ms in this function, the maximum speed would be 60000rpm !
   print("°, cumulative position ");
   print(rightEncoder.getCumulativePosition() * AS5600_RAW_TO_DEGREES);
-  print("° speed ");
-  print(rightEncoder.getAngularSpeed());
-  print("°/s ");
+  //print("° speed ");
+  //print(rightEncoder.getAngularSpeed());
+  //print("°/s ");
 
   // Check magnet positioning - this is for debug purposes only and is not required in normal operation.
   if (rightEncoder.magnetTooStrong())
@@ -154,13 +160,16 @@ void mecatro::controlLoop()
 
   // Set multiplexer to use port LEFT_ENCODER_PIN to talk to left encoder.
   multiplexer.setPort(LEFT_ENCODER_PIN);
+  leftBufCumul.push(leftEncoder.getCumulativePosition() * AS5600_RAW_TO_DEGREES);
+  leftBufRaw.push(leftEncoder.rawAngle() * AS5600_RAW_TO_DEGREES);
+
   print("Left encoder: ");
-  print(leftEncoder.rawAngle() * AS5600_RAW_TO_DEGREES);
+  print(leftBufRaw.last());
   print("°, cumulative position ");
-  print(leftEncoder.getCumulativePosition() * AS5600_RAW_TO_DEGREES);
-  print("° speed ");
-  print(leftEncoder.getAngularSpeed());
-  print("°/s ");
+  print(leftBufCumul.last());
+  //print("° speed ");
+  //print(leftEncoder.getAngularSpeed());
+  //print("°/s ");
 
   // Check magnet positioning - this is for debug purposes only and is not required in normal operation.
   if (leftEncoder.magnetTooStrong())
@@ -173,10 +182,12 @@ void mecatro::controlLoop()
   }
   println();
 
+  leftBuf2Derive.push(leftBufCumul.derivative(CONTROL_LOOP_PERIOD));
   // The first argument is the variable (column) id ; recall that in C++, numbering starts at 0.
-  mecatro::log(0,  leftEncoder.rawAngle() * AS5600_RAW_TO_DEGREES); 
-  mecatro::log(1,  leftEncoder.getCumulativePosition() * AS5600_RAW_TO_DEGREES); 
-  mecatro::log(2,  leftEncoder.getAngularSpeed()); 
+  mecatro::log(0,  leftEncoder.rawAngle() * AS5600_RAW_TO_DEGREES * 12.0/360); 
+  mecatro::log(1,  0.0);//leftBuf.last()); 
+  mecatro::log(2, leftBuf2Derive.mean());
+  //mecatro::log(2,  leftEncoder.getAngularSpeed()); 
 
   //Get the data from the sensor bar and load it into the class members
   multiplexer.setPort(LINE_FOLLOWER_PIN);
@@ -207,9 +218,9 @@ void mecatro::controlLoop()
   println("");
   
   //Wait 2/3 of a second
-  //delay(666);
+  //delay(666); //do not do that
 
 
   // Keep the motor off, i.e. at 0 duty cycle (1 is full forward, -1 full reverse)
-  mecatro::setMotorDutyCycle(0.2, -0.2);
+  mecatro::setMotorDutyCycle(0.2, 0.2);
 }

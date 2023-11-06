@@ -28,12 +28,10 @@ void println(T str){
 
 template<typename T>
 void print(T str){
-  Serial.println(str);
+  Serial.print(str);
 }
 
-void print(){
-  Serial.println();
-}
+
 
 void println(){
   Serial.println();
