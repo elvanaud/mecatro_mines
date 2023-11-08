@@ -124,6 +124,17 @@ void loop()
   mecatro::run();
 }
 
+/*double abs(double v)
+{
+  if(v < 0.0) return -v;
+  return v;
+}*/
+
+double cap(double v){
+  if(v < 0.0) return 0.0;
+  if(v > 1.0) return 1.0;
+  return v;
+}
 // This function is called periodically, every CONTROL_LOOP_PERIOD ms.
 // Put all your code here.
 void mecatro::controlLoop()
@@ -222,5 +233,12 @@ void mecatro::controlLoop()
 
 
   // Keep the motor off, i.e. at 0 duty cycle (1 is full forward, -1 full reverse)
-  mecatro::setMotorDutyCycle(0.2, 0.2);
+  double averageSpeed = 0.3;
+  double delta = mySensorBar.getPosition();
+  delta *= 2.0*averageSpeed/127.0;
+  double diffLeft = -1.0;
+  double diffRight = 1.0; //opposed signs
+  
+
+  mecatro::setMotorDutyCycle(cap(averageSpeed + diffLeft*delta), cap(averageSpeed + diffRight*delta));
 }
