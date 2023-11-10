@@ -27,6 +27,8 @@
 #define RIGHT_ENCODER_PIN 6
 #define LINE_FOLLOWER_PIN 1
 
+double MAX_SPEED = 330; //=rot/minute
+
 QWIICMUX multiplexer;
 AS5600 rightEncoder, leftEncoder;
 
@@ -43,6 +45,13 @@ SensorBar mySensorBar(SX1509_ADDRESS);
 Buffer leftBufCumul(10);
 Buffer leftBufRaw(10);
 Buffer leftBuf2Derive(20);
+
+double cumulativeAngle = 0.0;
+double currentCumul = 0.0;
+double prevCumul = 0.0;
+
+double prevDelta = 0.0;
+double delta = 0.0;
 
 void setup()
 {
@@ -124,14 +133,8 @@ void loop()
   mecatro::run();
 }
 
-/*double abs(double v)
-{
-  if(v < 0.0) return -v;
-  return v;
-}*/
-
 double cap(double v){
-  if(v < 0.0) return 0.0;
+  if(v < 0.0) return 0.0;//maybe remove that
   if(v > 1.0) return 1.0;
   return v;
 }
@@ -171,9 +174,10 @@ void mecatro::controlLoop()
 
   // Set multiplexer to use port LEFT_ENCODER_PIN to talk to left encoder.
   multiplexer.setPort(LEFT_ENCODER_PIN);
+  //cumulativeAngle += leftEncoder.rawAngle() * AS5600_RAW_TO_DEGREES;
   leftBufCumul.push(leftEncoder.getCumulativePosition() * AS5600_RAW_TO_DEGREES);
   leftBufRaw.push(leftEncoder.rawAngle() * AS5600_RAW_TO_DEGREES);
-
+  
   print("Left encoder: ");
   print(leftBufRaw.last());
   print("°, cumulative position ");
@@ -193,11 +197,15 @@ void mecatro::controlLoop()
   }
   println();
 
-  leftBuf2Derive.push(leftBufCumul.derivative(CONTROL_LOOP_PERIOD));
+  prevCumul = currentCumul;
+  currentCumul = leftEncoder.getCumulativePosition() * AS5600_RAW_TO_DEGREES;
+
+  leftBuf2Derive.push(leftBufCumul.derivative(CONTROL_LOOP_PERIOD*0.001)/360.0);
+  //leftBuf2Derive.push(leftEncoder.getAngularSpeed());
   // The first argument is the variable (column) id ; recall that in C++, numbering starts at 0.
   mecatro::log(0,  leftEncoder.rawAngle() * AS5600_RAW_TO_DEGREES * 12.0/360); 
-  mecatro::log(1,  0.0);//leftBuf.last()); 
-  mecatro::log(2, leftBuf2Derive.mean());
+  mecatro::log(1,  -leftEncoder.getAngularSpeed()/360.0);//leftEncoder.getCumulativePosition() * AS5600_RAW_TO_DEGREES);//leftBuf.last()); 
+  mecatro::log(2, -((currentCumul-prevCumul)/0.005)/360.0/4.0);//leftBuf2Derive.last());
   //mecatro::log(2,  leftEncoder.getAngularSpeed()); 
 
   //Get the data from the sensor bar and load it into the class members
@@ -233,12 +241,19 @@ void mecatro::controlLoop()
 
 
   // Keep the motor off, i.e. at 0 duty cycle (1 is full forward, -1 full reverse)
-  double averageSpeed = 0.3;
-  double delta = mySensorBar.getPosition();
-  delta *= 2.0*averageSpeed/127.0;
-  double diffLeft = -1.0;
-  double diffRight = 1.0; //opposed signs
+  const double K1 = 0.6/127.0; //0.6 is 2*averageSpeed
+  const double K2 = 0.0001;//good
+  double averageSpeed = 0.4; //mesure 0.5 tour/s
+  prevDelta = delta;
+  delta = mySensorBar.getPosition();
+  
+  double deltaPoint = K2*(delta-prevDelta)/0.005; // /4 ?
+  //delta *= 2.0*averageSpeed/127.0;
+  //delta *= K1;
+  //delta = 0.0;
+  //double diffLeft = -1.0;
+  //double diffRight = 1.0; //opposed signs
   
 
-  mecatro::setMotorDutyCycle(cap(averageSpeed + diffLeft*delta), cap(averageSpeed + diffRight*delta));
+  mecatro::setMotorDutyCycle(cap(averageSpeed - K1*delta - deltaPoint), cap(averageSpeed + K1*delta + deltaPoint));
 }
