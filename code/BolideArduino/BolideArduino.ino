@@ -52,6 +52,14 @@ double prevCumul = 0.0;
 
 double prevDelta = 0.0;
 double delta = 0.0;
+double prevDeltaPoint = 0.0;
+double deltaPoint = 0.0;
+
+double prevCumulPoint = 0.0;
+double cumulPoint = 0.0;
+
+Buffer derivBuffer(10);
+Buffer cumulBuffer(10);
 
 void setup()
 {
@@ -134,6 +142,7 @@ void loop()
 }
 
 double cap(double v){
+  //return 0.0;
   if(v < 0.0) return 0.0;//maybe remove that
   if(v > 1.0) return 1.0;
   return v;
@@ -204,8 +213,25 @@ void mecatro::controlLoop()
   //leftBuf2Derive.push(leftEncoder.getAngularSpeed());
   // The first argument is the variable (column) id ; recall that in C++, numbering starts at 0.
   mecatro::log(0,  leftEncoder.rawAngle() * AS5600_RAW_TO_DEGREES * 12.0/360); 
-  mecatro::log(1,  -leftEncoder.getAngularSpeed()/360.0);//leftEncoder.getCumulativePosition() * AS5600_RAW_TO_DEGREES);//leftBuf.last()); 
-  mecatro::log(2, -((currentCumul-prevCumul)/0.005)/360.0/4.0);//leftBuf2Derive.last());
+  mecatro::log(1,  leftEncoder.getAngularSpeed()/360.0);//leftEncoder.getCumulativePosition() * AS5600_RAW_TO_DEGREES);//leftBuf.last()); 
+  
+  /*const double N = 10.0;
+  prevCumulPoint = cumulPoint;
+  cumulPoint = (N*(currentCumul-prevCumul) + prevCumulPoint)/(1.0 + N * 0.005);*/
+  /*double N = 100.0;
+  double Ts = 0.005;
+  double a0 = 1 + N*Ts;
+  double a1 = -(2.0+N*Ts);
+  double a2 = 1.0;
+  double b0 = N;
+  double b1 = -2*N;
+  double b2 = N;
+
+  double derivative = (-a1/a0)*derivBuffer.last() - (a2/a0)*derivBuffer.beforeLast() + (b0/a0)*currentCumul + (b1/a0)*cumulBuffer.last() + (b2/a0) * cumulBuffer.beforeLast();
+  derivBuffer.push(derivative);
+  cumulBuffer.push(currentCumul);*/
+
+  //mecatro::log(2, derivative);//leftBuf2Derive.last());
   //mecatro::log(2,  leftEncoder.getAngularSpeed()); 
 
   //Get the data from the sensor bar and load it into the class members
@@ -241,13 +267,17 @@ void mecatro::controlLoop()
 
 
   // Keep the motor off, i.e. at 0 duty cycle (1 is full forward, -1 full reverse)
-  const double K1 = 0.6/127.0; //0.6 is 2*averageSpeed
-  const double K2 = 0.0001;//good
-  double averageSpeed = 0.4; //mesure 0.5 tour/s
+  const double K1 = 1.4/127.0; //0.6 is 2*averageSpeed
+  const double K2 = 5.0;//good
+  const double N = 100.0;
+  double targetSpeed = 0.68; //mesure 0.5 tour/s a 0.2 je crois
   prevDelta = delta;
   delta = mySensorBar.getPosition();
   
   double deltaPoint = K2*(delta-prevDelta)/0.005; // /4 ?
+  //prevDeltaPoint = deltaPoint;
+  //deltaPoint = (K2*N*(delta-prevDelta) + prevDeltaPoint)/(1.0 + N * 0.005);
+  
   //delta *= 2.0*averageSpeed/127.0;
   //delta *= K1;
   //delta = 0.0;
@@ -255,5 +285,7 @@ void mecatro::controlLoop()
   //double diffRight = 1.0; //opposed signs
   
 
-  mecatro::setMotorDutyCycle(cap(averageSpeed - K1*delta - deltaPoint), cap(averageSpeed + K1*delta + deltaPoint));
+  mecatro::setMotorDutyCycle(cap(targetSpeed - K1*delta - deltaPoint), cap(0.9*(targetSpeed + K1*delta + deltaPoint)));
+  //mecatro::setMotorDutyCycle(targetSpeed,0.900*targetSpeed); //coefficient pour corriger le drift
+  //mecatro::setMotorDutyCycle(0.0,0.0);
 }
